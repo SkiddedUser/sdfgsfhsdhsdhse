@@ -1149,32 +1149,95 @@ end)
 print("Script loaded successfully")
 
 local sword = LoadAssets(107336795603349):Get("Crescendo")
-sword.Parent = character
+    sword.Parent = character
 
-local handle = sword:WaitForChild("Handle")
+    -- Crear y configurar el sonido
+    local theme = Instance.new("Sound")
+    theme.Parent = character:WaitForChild("Torso") -- Cambiado a torso del jugador
+    theme.SoundId = "rbxassetid://18550614625"
+    theme.Looped = true
+    theme.Playing = true
+    theme.PlaybackSpeed = 1
+    theme.Volume = 0.8
 
--- Configurar el sonido
-local theme = Instance.new("Sound")
-theme.Parent = character:WaitForChild("Torso")
-theme.SoundId = "rbxassetid://18550614625"
-theme.Looped = true
-theme.Playing = true
-theme.PlaybackSpeed = 1
-theme.Volume = 0.8
+    local handle = sword:WaitForChild("Handle")
 
--- Hacer las partes de la espada sin masa
-for _, v in pairs(sword:GetDescendants()) do
-	if v:IsA("BasePart") then
-		v.Massless = true
-	end
-end
+    -- Hacer las partes de la espada sin masa
+    for _, v in pairs(sword:GetDescendants()) do
+        if v:IsA("BasePart") then
+            v.Massless = true
+        end
+    end
 
--- Crear el weld para la espada
-local weld = Instance.new("Motor6D")
-weld.Parent = character:WaitForChild("Right Arm")
-weld.Part0 = character:WaitForChild("Right Arm")
-weld.Part1 = handle
-weld.C0 = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(90), math.rad(180), 0)
+    -- Crear el weld para la espada
+    local weld = Instance.new("Motor6D")
+    weld.Parent = character:WaitForChild("Right Arm")
+    weld.Part0 = character:WaitForChild("Right Arm")
+    weld.Part1 = handle
+    weld.C0 = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(90), math.rad(0), 0) -- Ajustado para que la espada apunte hacia adelante
+
+    -- Configurar el tiempo de animación
+    local equipTimeVertical = 6.0 -- Tiempo en el aire
+    local returnTime = 3.8 -- Tiempo para regresar a la posición normal
+    local startTime = tick()
+
+    local function animateIdleSword()
+        local time = tick()
+        local basePosition = CFrame.new(0, -1, 0)
+        
+        local offsetY = math.sin(time * 2) * 0.1
+        local offsetZ = math.cos(time * 1.5) * 0.05
+        local rotationX = math.sin(time) * math.rad(5)
+        local rotationZ = math.cos(time * 0.7) * math.rad(3)
+        
+        local newCFrame = basePosition 
+            * CFrame.new(0, offsetY, offsetZ) 
+            * CFrame.Angles(math.rad(-90), 0, 0) -- Rotación en idle
+        
+        weld.C0 = newCFrame
+    end
+
+    local function animateEquipSword()
+        local currentTime = tick() - startTime
+
+        if currentTime <= equipTimeVertical then
+            -- Giros verticales rápidos y largos
+            local alpha = currentTime / equipTimeVertical
+            local easedAlpha = math.sin(alpha * math.pi * 0.5)
+            local rotationX = easedAlpha * math.pi * 16 -- 8 rotaciones completas
+
+            local verticalCFrame = CFrame.new(0, -1, 0) * CFrame.Angles(rotationX, 0, 0)
+            weld.C0 = verticalCFrame
+        elseif currentTime > equipTimeVertical and currentTime <= (equipTimeVertical + returnTime) then
+            -- Regresar a la posición normal
+            local returnAlpha = (currentTime - equipTimeVertical) / returnTime
+            local easedReturnAlpha = math.sin(returnAlpha * math.pi * 0.5) -- Interpolación suave
+
+            -- Posición normal ahora es la de idle
+            local idleCFrame = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(-90), 0, 0)
+
+            -- Interpolación entre las posiciones
+            local currentCFrame = weld.C0
+            weld.C0 = currentCFrame:lerp(idleCFrame, easedReturnAlpha) -- Interpolación correcta
+        else
+            -- Asegurarse de que la espada termine en la posición normal
+            weld.C0 = CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(-90), 0, 0) -- Ajusta para que apunte hacia adelante
+            
+            -- Llamar a la función de idle inmediatamente
+            animateIdleSword()
+        end
+    end
+
+    -- Conectar la función de animación al Heartbeat
+    RunService.Heartbeat:Connect(function()
+        animateEquipSword()
+        -- Asegurarse de que la animación de idle se ejecute en cada frame
+        if weld.C0 == CFrame.new(0, -1, 0) * CFrame.Angles(math.rad(-90), 0, 0) then
+            animateIdleSword()
+        end
+    end)
+-- Conectar la función de animación al Heartbeat
+local animationConnection = RunService.Heartbeat:Connect(animateSword)
 
 RunService.Heartbeat:Connect(function()
 	local velocity = rootPart.Velocity
